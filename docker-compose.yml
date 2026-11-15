@@ -32,5 +32,4 @@ services:
 
 volumes:
   postgres_data:
-  localstack_data:
   ministack_data:

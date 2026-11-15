@@ -1,69 +1,50 @@
 import {
   Entity,
+  Index,
+  ManyToOne,
   PrimaryKey,
   Property,
-  ManyToOne,
   Unique,
-  Index,
 } from '@mikro-orm/decorators/legacy';
 
-import { Wallet } from './wallet.entity';
+import { WalletEntity } from './wallet.entity';
 
-export type LedgerEntryType =
-  | 'OPENING'
-  | 'BET'
-  | 'WIN'
-  | 'REFUND'
-  | 'ROLLBACK';
-
-export type LedgerDirection = 'DEBIT' | 'CREDIT';
-
+/**
+ * Lançamento do ledger (append-only). O banco bloqueia UPDATE/DELETE/TRUNCATE
+ * via trigger e valida `balance_before ± amount = balance_after` via CHECK.
+ *
+ * A coluna `sequence` (identity) não é mapeada: é gerada pelo banco e usada
+ * apenas pela paginação por cursor (consulta nativa).
+ */
 @Entity({ tableName: 'ledger_entries' })
-@Unique({
-  properties: ['wallet', 'transactionId'],
-})
-@Index({
-  properties: ['wallet', 'createdAt'],
-})
-export class LedgerEntry {
+@Unique({ properties: ['wallet', 'transactionId'] })
+@Index({ properties: ['wallet', 'createdAt'] })
+export class LedgerEntryEntity {
   @PrimaryKey({ type: 'uuid' })
   id!: string;
 
-  @ManyToOne(() => Wallet, {
-    deleteRule: 'restrict',
-  })
-  wallet!: Wallet;
+  @ManyToOne(() => WalletEntity, { deleteRule: 'restrict' })
+  wallet!: WalletEntity;
 
   @Property({ type: 'uuid' })
   transactionId!: string;
 
+  /** Kind da transação de origem (OPENING, BET, WIN, REFUND, ROLLBACK). */
   @Property({ type: 'string', length: 20 })
-  type!: LedgerEntryType;
+  type!: string;
 
   @Property({ type: 'string', length: 10 })
-  direction!: LedgerDirection;
+  direction!: string;
 
-  @Property({
-    type: 'decimal',
-    precision: 20,
-    scale: 2,
-  })
+  @Property({ type: 'decimal', precision: 20, scale: 2 })
   amount!: string;
 
-  @Property({
-    type: 'decimal',
-    precision: 20,
-    scale: 2,
-  })
+  @Property({ type: 'decimal', precision: 20, scale: 2 })
   balanceBefore!: string;
 
-  @Property({
-    type: 'decimal',
-    precision: 20,
-    scale: 2,
-  })
+  @Property({ type: 'decimal', precision: 20, scale: 2 })
   balanceAfter!: string;
 
   @Property({ type: 'datetime' })
-  createdAt: Date = new Date();
+  createdAt!: Date;
 }

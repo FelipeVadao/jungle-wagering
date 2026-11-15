@@ -1,17 +1,43 @@
+import { Type } from 'class-transformer';
 import {
-  IsNotEmpty,
+  IsDefined,
+  IsInt,
+  IsOptional,
   IsString,
-  Length,
-  Matches,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 
+import { MoneyDto } from '../../wagering/dto/process-bet.dto';
+
+/**
+ * POST /wallets
+ * `{ "playerId": "<uuid>", "initialBalance": { "amount": "1000.00", "currency": "BRL" } }`
+ */
 export class CreateWalletDto {
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   playerId!: string;
 
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => MoneyDto)
+  initialBalance!: MoneyDto;
+}
+
+/** GET /wallets/:walletId/ledger?cursor=...&limit=50 */
+export class LedgerQueryDto {
+  @IsOptional()
   @IsString()
-  @Length(3, 3)
-  @Matches(/^[A-Z]{3}$/)
-  currency!: string;
+  @MaxLength(512)
+  cursor?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 }

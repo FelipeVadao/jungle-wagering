@@ -1,15 +1,17 @@
 import {
   Entity,
+  Index,
   PrimaryKey,
   Property,
-  Index,
 } from '@mikro-orm/decorators/legacy';
 
 export type OutboxEventStatus = 'PENDING' | 'PUBLISHED';
 
+/** Modelo de persistência da Transactional Outbox (ver OutboxMessage). */
 @Entity({ tableName: 'outbox_events' })
 @Index({ properties: ['status', 'createdAt'] })
-export class OutboxEvent {
+export class OutboxEventEntity {
+  /** = eventId do envelope; usado como MessageDeduplicationId no SQS. */
   @PrimaryKey({ type: 'uuid' })
   id!: string;
 
@@ -23,17 +25,22 @@ export class OutboxEvent {
   payload!: Record<string, unknown>;
 
   @Property({ type: 'string', length: 20 })
-  status: OutboxEventStatus = 'PENDING';
+  status!: OutboxEventStatus;
 
   @Property({ type: 'integer' })
-  attempts: number = 0;
+  attempts!: number;
 
+  /** Momento a partir do qual o evento pode ser (re)publicado (backoff). */
   @Property({ type: 'datetime' })
-  createdAt: Date = new Date();
+  nextAttemptAt!: Date;
+
+  /** occurredAt do evento. */
+  @Property({ type: 'datetime' })
+  createdAt!: Date;
 
   @Property({ type: 'datetime', nullable: true })
-  publishedAt?: Date;
+  publishedAt?: Date | null;
 
   @Property({ type: 'text', nullable: true })
-  lastError?: string;
+  lastError?: string | null;
 }

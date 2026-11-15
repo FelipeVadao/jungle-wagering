@@ -1,9 +1,7 @@
-
 import { Type } from 'class-transformer';
-
 import {
   IsDefined,
-  IsEnum,
+  IsIn,
   IsNotEmpty,
   IsString,
   IsUUID,
@@ -13,23 +11,30 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-import { WagerTransactionType } from '../entities/wager-transaction.entity';
+import {
+  SUBMITTABLE_KINDS,
+  WagerTransactionKind,
+} from '../domain/wager-transaction';
 
-// Mantém o nome utilizado pelo restante do projeto,
-// mas reutiliza o enum oficial da entidade.
-export { WagerTransactionType as WagerOperationType };
-
+/**
+ * `{ "amount": "25.00", "currency": "BRL" }` — amount é string decimal com
+ * até 2 casas (sem sinal, expoente, NaN ou Infinity). `number` é rejeitado.
+ */
 export class MoneyDto {
   @IsString()
-  @Matches(/^(0|[1-9]\d*)\.\d{2}$/)
+  @Matches(/^(0|[1-9]\d{0,17})(\.\d{1,2})?$/, {
+    message:
+      'amount must be a non-negative decimal string with at most 2 decimal places',
+  })
   amount!: string;
 
   @IsString()
-  @Matches(/^[A-Z]{3}$/)
+  @Matches(/^[A-Z]{3}$/, { message: 'currency must be an ISO-4217 code' })
   currency!: string;
 }
 
-export class ProcessBetDto {
+/** Corpo de POST /wagering/transactions (Idempotency-Key vem no header). */
+export class SubmitWagerTransactionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -56,30 +61,34 @@ export class ProcessBetDto {
   @MaxLength(255)
   gameId!: string;
 
-  @IsEnum(WagerTransactionType)
-  kind!: WagerTransactionType;
+  /** OPENING é interno e não pode ser submetido. */
+  @IsIn(SUBMITTABLE_KINDS, {
+    message: `kind must be one of: ${SUBMITTABLE_KINDS.join(', ')}`,
+  })
+  kind!: WagerTransactionKind;
 
   @IsDefined()
   @ValidateNested()
   @Type(() => MoneyDto)
   money!: MoneyDto;
 
+  /** Obrigatório para REFUND/ROLLBACK; opcional para WIN/LOSS. */
   @ValidateIf(
-    (dto: ProcessBetDto) =>
-      dto.kind === WagerTransactionType.REFUND ||
-      dto.kind === WagerTransactionType.ROLLBACK,
+    (dto: SubmitWagerTransactionDto) =>
+      dto.kind === WagerTransactionKind.Refund ||
+      dto.kind === WagerTransactionKind.Rollback ||
+      dto.referenceExternalTransactionId !== undefined,
   )
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
   referenceExternalTransactionId?: string;
+}
 
-  // Compatibilidade temporária com trechos antigos do projeto.
-  get type(): WagerTransactionType {
-    return this.kind;
-  }
-
-  get amount(): string {
-    return this.money.amount;
-  }
+/** `data` da mensagem SQS `WagerTransactionRequested`. */
+export class WagerTransactionRequestedDataDto extends SubmitWagerTransactionDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  idempotencyKey!: string;
 }

@@ -1,57 +1,44 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { ReflectMetadataProvider } from '@mikro-orm/decorators/legacy';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
-
-import { Wallet } from './wallets/entities/wallet.entity';
-import { LedgerEntry } from './wallets/entities/ledger-entry.entity';
-import { WalletsModule } from './wallets/wallets.module';
-
-import { WagerTransaction } from './wagering/entities/wager-transaction.entity';
-import { WageringModule } from './wagering/wagering.module';
-
-import { OutboxEvent } from './messaging/entities/outbox-event.entity';
-import { InboxMessage } from './messaging/entities/inbox-message.entity';
+import { CorrelationIdMiddleware } from './common/http/correlation-id.middleware';
+import { HttpErrorFilter } from './common/http/http-error.filter';
+import { createValidationPipe } from './common/http/validation';
+import { databaseOptions } from './database.config';
+import { HealthModule } from './health/health.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { ObservabilityModule } from './observability/observability.module';
+import { WageringModule } from './wagering/wagering.module';
+import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
 
     MikroOrmModule.forRootAsync({
       driver: PostgreSqlDriver,
       imports: [ConfigModule],
       inject: [ConfigService],
-
-      useFactory: (config: ConfigService) => ({
-        host: config.getOrThrow<string>('DB_HOST'),
-        port: Number(config.getOrThrow<string>('DB_PORT')),
-        dbName: config.getOrThrow<string>('DB_NAME'),
-        user: config.getOrThrow<string>('DB_USER'),
-        password: config.getOrThrow<string>('DB_PASSWORD'),
-        metadataProvider: ReflectMetadataProvider,
-        entities: [
-          Wallet,
-          LedgerEntry,
-          WagerTransaction,
-          OutboxEvent,
-          InboxMessage,
-        ],
-        debug: true,
-      }),
+      useFactory: (config: ConfigService) =>
+        databaseOptions((key) => config.get<string>(key)),
     }),
 
+    ObservabilityModule,
     MessagingModule,
     WalletsModule,
     WageringModule,
+    HealthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    { provide: APP_PIPE, useFactory: createValidationPipe },
+    { provide: APP_FILTER, useClass: HttpErrorFilter },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CorrelationIdMiddleware).forRoutes('*path');
+  }
+}

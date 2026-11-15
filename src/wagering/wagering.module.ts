@@ -1,24 +1,24 @@
-
 import { Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 
-import { WagerTransaction } from './entities/wager-transaction.entity';
-import { Wallet } from '../wallets/entities/wallet.entity';
-import { LedgerEntry } from '../wallets/entities/ledger-entry.entity';
+import { LedgerEntryEntity } from '../wallets/entities/ledger-entry.entity';
+import { WalletEntity } from '../wallets/entities/wallet.entity';
 
+import { WagerTransactionEntity } from './entities/wager-transaction.entity';
+import { PendingReferenceWorker } from './pending-reference.worker';
 import { WageringController } from './wagering.controller';
 import { WageringService } from './wagering.service';
 
 @Module({
   imports: [
     MikroOrmModule.forFeature([
-      WagerTransaction,
-      Wallet,
-      LedgerEntry,
+      WagerTransactionEntity,
+      WalletEntity,
+      LedgerEntryEntity,
     ]),
   ],
   controllers: [WageringController],
-  providers: [WageringService],
-  exports: [WageringService],
+  providers: [WageringService, PendingReferenceWorker],
+  exports: [WageringService, PendingReferenceWorker],
 })
 export class WageringModule {}

@@ -1,0 +1,4 @@
+[test]
+# Isola os testes: banco `wagering_test` (recriado a cada execução) e filas
+# `*-test.fifo`. Nada é lido/escrito no banco ou nas filas de desenvolvimento.
+preload = ["./test/support/env.ts"]
