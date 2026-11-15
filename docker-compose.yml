@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: jungle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: wagering
+      POSTGRES_USER: wagering_app
+      POSTGRES_PASSWORD: dev_password_change_me
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wagering_app -d wagering"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  ministack:
+    image: ministackorg/ministack:latest
+    container_name: jungle-ministack
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      PERSIST_STATE: "1"
+      STATE_DIR: /data/ministack-state
+      MINISTACK_REGION: us-east-1
+    volumes:
+      - ministack_data:/data
+
+volumes:
+  postgres_data:
+  localstack_data:
+  ministack_data:
